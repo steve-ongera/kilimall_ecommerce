@@ -16,7 +16,7 @@ SECRET_KEY = 'django-insecure-odz(ef=huq__9p9s9m3_a)to0rsh&%-e@7vtr0*1eo4t&r3zzv
 # SECURITY WARNING: don't run with debug turned on in production!
 DEBUG = True
 
-ALLOWED_HOSTS = []
+ALLOWED_HOSTS = ['*']
 
 
 # Application definition
@@ -142,6 +142,7 @@ SIMPLE_JWT = {
 
 # ─── CORS ─────────────────────────────────────────────────────────────────────
 CORS_ALLOWED_ORIGINS = [
+    'https://fc73-2c0f-6300-d09-fd00-e8d7-8af6-2376-b01c.ngrok-free.app',
     'http://localhost:3000',
     'http://127.0.0.1:3000',
     'http://localhost:5173',       # ← add this
@@ -169,7 +170,8 @@ MPESA_CONSUMER_KEY = config('MPESA_CONSUMER_KEY', default='')
 MPESA_CONSUMER_SECRET = config('MPESA_CONSUMER_SECRET', default='')
 MPESA_SHORTCODE = config('MPESA_SHORTCODE', default='174379')           # Sandbox shortcode
 MPESA_PASSKEY = config('MPESA_PASSKEY', default='')
-MPESA_CALLBACK_URL = config('MPESA_CALLBACK_URL', default='https://yourdomain.com/api/v1/mpesa/callback/')
+MPESA_CALLBACK_URL = config('MPESA_CALLBACK_URL', default='https://fc73-2c0f-6300-d09-fd00-e8d7-8af6-2376-b01c.ngrok-free.app/api/v1/mpesa/callback/')
+
 
 # ─── Logging ──────────────────────────────────────────────────────────────────
 LOGGING = {

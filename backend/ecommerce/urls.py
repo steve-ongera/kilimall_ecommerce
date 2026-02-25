@@ -26,6 +26,7 @@ urlpatterns = [
     path('mpesa/stk-push/', views.MpesaSTKPushView.as_view(), name='mpesa-stk-push'),
     path('mpesa/callback/', views.MpesaCallbackView.as_view(), name='mpesa-callback'),
     path('mpesa/status/<str:checkout_request_id>/', views.MpesaStatusView.as_view(), name='mpesa-status'),
+    path('mpesa/query/<str:checkout_request_id>/', views.MpesaSTKQueryView.as_view(), name='mpesa-query'),
 
     path('', include(router.urls)),
 ]

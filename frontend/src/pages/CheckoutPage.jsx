@@ -8,13 +8,15 @@ import { Spinner } from '../components/common';
 // ─── M-Pesa Modal ─────────────────────────────────────────────────────────────
 function MpesaModal({ order, onSuccess, onClose }) {
   const [phone, setPhone] = useState('');
-  const [status, setStatus] = useState('idle'); // idle | pending | polling | success | failed
+  const [status, setStatus] = useState('idle');
   const [checkoutId, setCheckoutId] = useState(null);
   const [message, setMessage] = useState('');
+  const [elapsed, setElapsed] = useState(0); // seconds waiting
 
   const handlePay = async () => {
     if (!phone) return;
     setStatus('pending');
+    setElapsed(0);
     try {
       const { data } = await mpesaAPI.stkPush({ phone_number: phone, order_id: order.id });
       setCheckoutId(data.checkout_request_id);
@@ -26,28 +28,66 @@ function MpesaModal({ order, onSuccess, onClose }) {
     }
   };
 
-  // Poll for status
+  // Smart polling:
+  // - First 15s  → check DB only via /status/ (fast, no Safaricom rate limit)
+  // - After 15s  → actively query Safaricom via /query/ (catches slow/missing callbacks)
+  // - After 2min → timeout
   useEffect(() => {
     if (status !== 'polling' || !checkoutId) return;
+
+    let pollCount = 0;
+    const MAX_POLLS = 40; // 40 × 3s = 2 minutes
+
     const interval = setInterval(async () => {
       try {
-        const { data } = await mpesaAPI.status(checkoutId);
+        pollCount++;
+        setElapsed(pollCount * 3);
+
+        // Switch to active Safaricom query after poll #5 (~15s)
+        const { data } = pollCount > 5
+          ? await mpesaAPI.query(checkoutId)
+          : await mpesaAPI.status(checkoutId);
+
         if (data.status === 'success') {
           setStatus('success');
           clearInterval(interval);
           setTimeout(onSuccess, 2000);
-        } else if (data.status === 'failed' || data.status === 'cancelled') {
+          return;
+        }
+
+        if (data.status === 'failed' || data.status === 'cancelled') {
           setStatus('failed');
-          setMessage('Payment was cancelled or failed. Try again.');
+          setMessage(data.result_desc || 'Payment was cancelled or failed. Try again.');
+          clearInterval(interval);
+          return;
+        }
+
+        // Timeout after MAX_POLLS
+        if (pollCount >= MAX_POLLS) {
+          setStatus('failed');
+          setMessage('Payment timed out. Please check your M-Pesa messages and try again.');
           clearInterval(interval);
         }
-      } catch {}
+      } catch {
+        // Network hiccup — keep polling silently
+      }
     }, 3000);
+
     return () => clearInterval(interval);
   }, [status, checkoutId]);
 
+  // Countdown display helper
+  const waitingText = elapsed < 20
+    ? 'Enter your PIN to complete payment. Waiting for confirmation...'
+    : elapsed < 60
+    ? `Still waiting... (${elapsed}s). Make sure you entered your PIN.`
+    : `Waiting ${Math.floor(elapsed / 60)}m ${elapsed % 60}s — checking with Safaricom...`;
+
   return (
-    <div className="mpesa-modal" onClick={e => e.target === e.currentTarget && status !== 'polling' && onClose()}>
+    <div
+      className="mpesa-modal"
+      onClick={e => e.target === e.currentTarget && status !== 'polling' && onClose()}
+    >
       <div className="mpesa-modal-inner">
         <div className="mpesa-logo">M-PESA</div>
         <h3 style={{ fontSize: 18, fontWeight: 700, marginBottom: 8 }}>
@@ -62,13 +102,21 @@ function MpesaModal({ order, onSuccess, onClose }) {
             </p>
             <div className="mpesa-phone-input">
               <div className="mpesa-prefix">+254</div>
-              <input type="tel" placeholder="712 345 678" value={phone}
-                onChange={e => setPhone(e.target.value)} maxLength={10} />
+              <input
+                type="tel"
+                placeholder="712 345 678"
+                value={phone}
+                onChange={e => setPhone(e.target.value)}
+                maxLength={10}
+              />
             </div>
             <button className="btn-mpesa" onClick={handlePay}>
               <i className="bi bi-phone"></i> Send M-Pesa Request
             </button>
-            <button onClick={onClose} style={{ width: '100%', marginTop: 12, background: 'none', border: '1px solid #e8e8e8', padding: 10, borderRadius: 4, cursor: 'pointer', fontSize: 14 }}>
+            <button
+              onClick={onClose}
+              style={{ width: '100%', marginTop: 12, background: 'none', border: '1px solid #e8e8e8', padding: 10, borderRadius: 4, cursor: 'pointer', fontSize: 14 }}
+            >
               Cancel
             </button>
           </>
@@ -86,9 +134,9 @@ function MpesaModal({ order, onSuccess, onClose }) {
             <div className="mpesa-spinner"></div>
             <p style={{ fontWeight: 700, marginBottom: 8, fontSize: 16 }}>Check your phone!</p>
             <p style={{ color: '#555', fontSize: 14, marginBottom: 8 }}>
-              An M-Pesa STK push has been sent to <strong>{phone}</strong>.
+              An M-Pesa STK push has been sent to <strong>+254{phone}</strong>.
             </p>
-            <p style={{ color: '#888', fontSize: 13 }}>Enter your PIN to complete payment. Waiting for confirmation...</p>
+            <p style={{ color: '#888', fontSize: 13 }}>{waitingText}</p>
           </div>
         )}
 
@@ -105,8 +153,13 @@ function MpesaModal({ order, onSuccess, onClose }) {
             <i className="bi bi-x-circle-fill" style={{ fontSize: 52, color: 'var(--kl-red)', display: 'block', marginBottom: 12 }}></i>
             <p style={{ fontWeight: 700, color: 'var(--kl-red)', marginBottom: 8 }}>Payment Failed</p>
             <p style={{ color: '#555', fontSize: 14, marginBottom: 16 }}>{message}</p>
-            <button className="btn-mpesa" onClick={() => setStatus('idle')}>Try Again</button>
-            <button onClick={onClose} style={{ width: '100%', marginTop: 8, background: 'none', border: '1px solid #e8e8e8', padding: 10, borderRadius: 4, cursor: 'pointer', fontSize: 14 }}>
+            <button className="btn-mpesa" onClick={() => { setStatus('idle'); setElapsed(0); }}>
+              Try Again
+            </button>
+            <button
+              onClick={onClose}
+              style={{ width: '100%', marginTop: 8, background: 'none', border: '1px solid #e8e8e8', padding: 10, borderRadius: 4, cursor: 'pointer', fontSize: 14 }}
+            >
               Cancel
             </button>
           </div>
@@ -180,10 +233,14 @@ export default function CheckoutPage() {
 
   if (loading || cart.items.length === 0) {
     return cart.items.length === 0
-      ? <div className="container" style={{ paddingTop: 40, textAlign: 'center' }}>
+      ? (
+        <div className="container" style={{ paddingTop: 40, textAlign: 'center' }}>
           <p>Your cart is empty.</p>
-          <button onClick={() => navigate('/products')} className="btn-primary" style={{ width: 'auto', padding: '10px 24px', marginTop: 12 }}>Shop Now</button>
+          <button onClick={() => navigate('/products')} className="btn-primary" style={{ width: 'auto', padding: '10px 24px', marginTop: 12 }}>
+            Shop Now
+          </button>
         </div>
+      )
       : <Spinner />;
   }
 
@@ -239,7 +296,6 @@ export default function CheckoutPage() {
               <div className="step-number">2</div>
               <div className="step-title">Select Pickup Station</div>
             </div>
-
             <div className="form-group">
               <label className="form-label">Select County</label>
               <select className="form-control" value={selectedCounty}
@@ -256,9 +312,11 @@ export default function CheckoutPage() {
                 <label className="form-label">Choose a Pickup Station</label>
                 <div className="station-grid">
                   {stations.map(station => (
-                    <div key={station.id}
+                    <div
+                      key={station.id}
                       className={`station-card ${selectedStation?.id === station.id ? 'selected' : ''}`}
-                      onClick={() => setSelectedStation(station)}>
+                      onClick={() => setSelectedStation(station)}
+                    >
                       <div className="station-name">
                         {selectedStation?.id === station.id && (
                           <i className="bi bi-check-circle-fill" style={{ color: 'var(--kl-orange)', marginRight: 6 }}></i>
@@ -306,14 +364,15 @@ export default function CheckoutPage() {
         {/* Order Summary */}
         <div className="cart-summary" style={{ position: 'sticky', top: 80 }}>
           <h2 style={{ fontSize: 16, fontWeight: 800, marginBottom: 16 }}>Order Summary</h2>
-
-          {/* Items */}
           <div style={{ maxHeight: 280, overflowY: 'auto', marginBottom: 12 }}>
             {cart.items.map(item => (
               <div key={item.id} style={{ display: 'flex', gap: 10, alignItems: 'center', marginBottom: 12, paddingBottom: 12, borderBottom: '1px solid #f0f0f0' }}>
                 <div style={{ width: 48, height: 48, border: '1px solid #e8e8e8', borderRadius: 4, overflow: 'hidden', flexShrink: 0 }}>
-                  <img src={item.product.primary_image || 'https://via.placeholder.com/48'} alt={item.product.name}
-                    style={{ width: '100%', height: '100%', objectFit: 'contain' }} />
+                  <img
+                    src={item.product.primary_image || 'https://via.placeholder.com/48'}
+                    alt={item.product.name}
+                    style={{ width: '100%', height: '100%', objectFit: 'contain' }}
+                  />
                 </div>
                 <div style={{ flex: 1 }}>
                   <div style={{ fontSize: 12, lineHeight: 1.3, marginBottom: 2 }}>{item.product.name}</div>
@@ -342,9 +401,12 @@ export default function CheckoutPage() {
             <span>KES {total.toLocaleString()}</span>
           </div>
 
-          <button className="btn-primary" style={{ marginTop: 16 }}
+          <button
+            className="btn-primary"
+            style={{ marginTop: 16 }}
             onClick={handlePlaceOrder}
-            disabled={submitting || !selectedStation || !form.customer_name || !form.customer_phone}>
+            disabled={submitting || !selectedStation || !form.customer_name || !form.customer_phone}
+          >
             {submitting
               ? <><div className="mpesa-spinner" style={{ width: 18, height: 18, borderWidth: 2, display: 'inline-block', marginRight: 8 }}></div>Placing Order...</>
               : <><i className="bi bi-lock-fill"></i> Place Order & Pay</>

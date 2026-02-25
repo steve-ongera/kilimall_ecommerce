@@ -282,7 +282,12 @@ class PickupStationAdmin(admin.ModelAdmin):
     address_short.short_description = "Address"
 
     def fee_display(self, obj):
-        return format_html('<b style="color:#f85606">KES {:,}</b>', int(obj.delivery_fee))
+        fee = f"{int(obj.delivery_fee):,}"
+        return format_html(
+            '<b style="color:#f85606">KES {}</b>',
+            fee
+        ) 
+
     fee_display.short_description = "Delivery Fee"
     fee_display.admin_order_field = "delivery_fee"
 

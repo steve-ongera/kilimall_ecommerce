@@ -277,18 +277,27 @@ class OrderSerializer(serializers.ModelSerializer):
 
 # ─── M-Pesa ───────────────────────────────────────────────────────────────────
 
+# serializers.py
+
 class MpesaSTKPushSerializer(serializers.Serializer):
     phone_number = serializers.CharField(max_length=15)
     order_id = serializers.UUIDField()
 
-    def validate_phone_number(self, value):
+    def validate_phone_number(self, value):  # ← replace this entire method
         value = value.strip().replace(' ', '').replace('-', '')
-        if value.startswith('0'):
-            value = '254' + value[1:]
-        elif value.startswith('+'):
+        
+        if value.startswith('+'):
             value = value[1:]
+        elif value.startswith('0'):
+            value = '254' + value[1:]
+        elif value.startswith('254'):
+            pass  # already correct
+        elif len(value) == 9:
+            value = '254' + value
+        
         if not value.startswith('254') or len(value) != 12:
             raise serializers.ValidationError('Enter a valid Kenyan phone number (e.g. 0712345678).')
+        
         return value
 
 

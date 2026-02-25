@@ -85,6 +85,7 @@ export const orderAPI = {
 export const mpesaAPI = {
   stkPush: (data) => api.post('/mpesa/stk-push/', data),
   status: (checkoutId) => api.get(`/mpesa/status/${checkoutId}/`),
+  query:   (id)   => api.get(`/mpesa/query/${id}/`),  // ← add if missing
 };
 
 export const wishlistAPI = {

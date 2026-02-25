@@ -222,6 +222,7 @@ class CartItemView(APIView):
 
 # ─── Orders ───────────────────────────────────────────────────────────────────
 
+
 class OrderViewSet(viewsets.ModelViewSet):
     serializer_class = OrderSerializer
     permission_classes = [IsAuthenticated]
@@ -229,15 +230,6 @@ class OrderViewSet(viewsets.ModelViewSet):
 
     def get_queryset(self):
         return Order.objects.filter(user=self.request.user).prefetch_related('items').select_related('pickup_station')
-
-    def create(self, request):
-        cart = get_or_create_cart(request)
-        if not cart.items.exists():
-            return Response({'error': 'Cart is empty.'}, status=400)
-        serializer = OrderSerializer(data=request.data, context={'request': request, 'cart': cart})
-        serializer.is_valid(raise_exception=True)
-        order = serializer.save()
-        return Response(OrderSerializer(order).data, status=201)
 
     @action(detail=False, methods=['get'])
     def by_number(self, request):
@@ -248,30 +240,100 @@ class OrderViewSet(viewsets.ModelViewSet):
             return Response({'error': 'Order not found.'}, status=404)
         return Response(OrderSerializer(order).data)
 
+    def create(self, request):
+        print("\n" + "="*60)
+        print("📦 ORDER CREATE - DEBUG")
+        print("="*60)
 
-# ─── M-Pesa STK Push ──────────────────────────────────────────────────────────
+        print(f"👤 User         : {request.user} | authenticated: {request.user.is_authenticated}")
+        print(f"📨 Request data : {dict(request.data)}")
 
+        cart = get_or_create_cart(request)
+        print(f"🛒 Cart id      : {cart.id}")
+        print(f"🛒 Cart items   : {cart.items.count()}")
+        for item in cart.items.all():
+            print(f"   - {item.product.name} x{item.quantity} @ KES {item.product.price} = KES {item.subtotal}")
+        print(f"🛒 Cart total   : KES {cart.get_total()}")
+
+        if not cart.items.exists():
+            print("❌ FAIL: Cart is empty")
+            return Response({'error': 'Cart is empty.'}, status=400)
+
+        station_id = request.data.get('pickup_station_id')
+        print(f"🏪 pickup_station_id received: {station_id!r}")
+        if station_id:
+            try:
+                station = PickupStation.objects.get(id=station_id)
+                print(f"🏪 Station found: {station.name} | fee: KES {station.delivery_fee}")
+            except PickupStation.DoesNotExist:
+                print(f"❌ FAIL: PickupStation id={station_id} does NOT exist in DB")
+        else:
+            print("❌ FAIL: pickup_station_id is missing from request data")
+
+        print("\n--- Serializer validation ---")
+        serializer = OrderSerializer(
+            data=request.data,
+            context={'request': request, 'cart': cart}
+        )
+        is_valid = serializer.is_valid()
+        print(f"✅ is_valid      : {is_valid}")
+        if not is_valid:
+            print(f"❌ Errors        : {serializer.errors}")
+            print("="*60 + "\n")
+            return Response(serializer.errors, status=400)
+
+        try:
+            order = serializer.save()
+            print(f"🎉 Order created : #{order.order_number} | total: KES {order.total}")
+            print("="*60 + "\n")
+            return Response(OrderSerializer(order).data, status=201)
+        except Exception as e:
+            import traceback
+            traceback.print_exc()
+            print("="*60 + "\n")
+            return Response({'error': str(e)}, status=400)
+        
 def get_mpesa_access_token():
     url = 'https://sandbox.safaricom.co.ke/oauth/v1/generate?grant_type=client_credentials'
     if not settings.MPESA_ENVIRONMENT == 'sandbox':
         url = 'https://api.safaricom.co.ke/oauth/v1/generate?grant_type=client_credentials'
+    
     response = requests.get(url, auth=(settings.MPESA_CONSUMER_KEY, settings.MPESA_CONSUMER_SECRET))
-    return response.json().get('access_token')
+    result = response.json()
+    
+    print(f"🔑 Token response status : {response.status_code}")
+    print(f"🔑 Token response body   : {result}")
+    
+    token = result.get('access_token')
+    if not token:
+        raise ValueError(f"Failed to get access token: {result}")
+    return token
 
 
 class MpesaSTKPushView(APIView):
     permission_classes = [AllowAny]
 
     def post(self, request):
+        print("\n" + "="*60)
+        print("💳 MPESA STK PUSH - DEBUG")
+        print("="*60)
+        print(f"📨 Request data: {dict(request.data)}")
+
         serializer = MpesaSTKPushSerializer(data=request.data)
-        serializer.is_valid(raise_exception=True)
+        if not serializer.is_valid():
+            print(f"❌ Serializer errors: {serializer.errors}")
+            return Response(serializer.errors, status=400)
 
         phone = serializer.validated_data['phone_number']
         order_id = serializer.validated_data['order_id']
+        print(f"📱 Phone (normalized): {phone}")
+        print(f"🧾 Order ID          : {order_id}")
 
         try:
             order = Order.objects.get(id=order_id)
+            print(f"✅ Order found: #{order.order_number} | total: KES {order.total} | payment_status: {order.payment_status}")
         except Order.DoesNotExist:
+            print(f"❌ Order {order_id} not found")
             return Response({'error': 'Order not found.'}, status=404)
 
         amount = int(order.total)
@@ -280,7 +342,23 @@ class MpesaSTKPushView(APIView):
         passkey = settings.MPESA_PASSKEY
         password = base64.b64encode(f"{shortcode}{passkey}{timestamp}".encode()).decode()
 
-        token = get_mpesa_access_token()
+        print(f"\n--- M-Pesa Config ---")
+        print(f"🏦 Shortcode     : {shortcode}")
+        print(f"🌍 Environment   : {settings.MPESA_ENVIRONMENT}")
+        print(f"🔗 Callback URL  : {settings.MPESA_CALLBACK_URL}")
+        print(f"💰 Amount        : {amount}")
+        print(f"🕐 Timestamp     : {timestamp}")
+        # Mask passkey but confirm it's set
+        print(f"🔐 Passkey set   : {'Yes' if passkey else 'NO - THIS IS THE PROBLEM'}")
+        print(f"🔐 Consumer key  : {'Yes' if settings.MPESA_CONSUMER_KEY else 'NO - THIS IS THE PROBLEM'}")
+
+        try:
+            token = get_mpesa_access_token()
+            print(f"🔑 Access token  : {token[:20]}..." if token else "❌ No token!")
+        except Exception as e:
+            print(f"❌ Token fetch failed: {e}")
+            return Response({'error': f'Could not get M-Pesa token: {str(e)}'}, status=500)
+
         base_url = 'https://sandbox.safaricom.co.ke' if settings.MPESA_ENVIRONMENT == 'sandbox' else 'https://api.safaricom.co.ke'
 
         payload = {
@@ -297,9 +375,20 @@ class MpesaSTKPushView(APIView):
             "TransactionDesc": f"Payment for order {order.order_number}",
         }
 
+        print(f"\n--- STK Push Payload ---")
+        print(f"📤 Payload (sans password): { {k: v for k, v in payload.items() if k != 'Password'} }")
+
         headers = {"Authorization": f"Bearer {token}", "Content-Type": "application/json"}
-        response = requests.post(f"{base_url}/mpesa/stkpush/v1/processrequest", json=payload, headers=headers)
+        stk_url = f"{base_url}/mpesa/stkpush/v1/processrequest"
+        print(f"🌐 Posting to: {stk_url}")
+
+        response = requests.post(stk_url, json=payload, headers=headers)
         data = response.json()
+
+        print(f"\n--- Safaricom Response ---")
+        print(f"📥 Status code : {response.status_code}")
+        print(f"📥 Response    : {data}")
+        print("="*60 + "\n")
 
         if data.get('ResponseCode') == '0':
             txn = MpesaTransaction.objects.create(
@@ -313,9 +402,10 @@ class MpesaSTKPushView(APIView):
                 'message': 'STK push sent. Check your phone.',
                 'checkout_request_id': txn.checkout_request_id,
             })
+
         return Response({'error': data.get('errorMessage', 'STK push failed.')}, status=400)
-
-
+    
+    
 class MpesaCallbackView(APIView):
     permission_classes = [AllowAny]
 
@@ -386,3 +476,80 @@ class BannerViewSet(viewsets.ReadOnlyModelViewSet):
     queryset = Banner.objects.filter(is_active=True)
     serializer_class = BannerSerializer
     permission_classes = [AllowAny]
+    
+    
+    
+class MpesaSTKQueryView(APIView):
+    """Actively query Safaricom for STK push status - fallback if callback is slow."""
+    permission_classes = [AllowAny]
+
+    def get(self, request, checkout_request_id):
+        try:
+            txn = MpesaTransaction.objects.get(checkout_request_id=checkout_request_id)
+        except MpesaTransaction.DoesNotExist:
+            return Response({'error': 'Transaction not found.'}, status=404)
+
+        # If already resolved, return immediately
+        if txn.status in ('success', 'failed', 'cancelled'):
+            return Response(MpesaTransactionSerializer(txn).data)
+
+        # Query Safaricom directly
+        try:
+            token = get_mpesa_access_token()
+            timestamp = datetime.now().strftime('%Y%m%d%H%M%S')
+            shortcode = settings.MPESA_SHORTCODE
+            password = base64.b64encode(
+                f"{shortcode}{settings.MPESA_PASSKEY}{timestamp}".encode()
+            ).decode()
+
+            base_url = (
+                'https://sandbox.safaricom.co.ke'
+                if settings.MPESA_ENVIRONMENT == 'sandbox'
+                else 'https://api.safaricom.co.ke'
+            )
+
+            payload = {
+                "BusinessShortCode": shortcode,
+                "Password": password,
+                "Timestamp": timestamp,
+                "CheckoutRequestID": checkout_request_id,
+            }
+            headers = {
+                "Authorization": f"Bearer {token}",
+                "Content-Type": "application/json",
+            }
+
+            response = requests.post(
+                f"{base_url}/mpesa/stkpushquery/v1/query",
+                json=payload,
+                headers=headers,
+            )
+            data = response.json()
+            print(f"🔍 STK Query response: {data}")
+
+            result_code = data.get('ResultCode')
+
+            if result_code is not None:
+                result_code = int(result_code)
+                txn.result_code = result_code
+                txn.result_desc = data.get('ResultDesc', '')
+
+                if result_code == 0:
+                    txn.status = 'success'
+                    if txn.order:
+                        txn.order.payment_status = 'paid'
+                        txn.order.status = 'confirmed'
+                        txn.order.save(update_fields=['payment_status', 'status'])
+                elif result_code in (1032, 1037):
+                    # 1032 = cancelled by user, 1037 = timeout
+                    txn.status = 'cancelled'
+                else:
+                    txn.status = 'failed'
+
+                txn.save()
+
+        except Exception as e:
+            print(f"❌ STK Query failed: {e}")
+            # Don't fail — just return current DB status
+
+        return Response(MpesaTransactionSerializer(txn).data)
