@@ -50,7 +50,7 @@ export const authAPI = {
 
 export const categoryAPI = {
   list: () => api.get('/categories/'),
-  detail: (slug) => api.get(`/categories/${slug}/`),
+  detail: (slug) => api.get(`/categories/${slug}/`),  // ← add this
 };
 
 export const productAPI = {

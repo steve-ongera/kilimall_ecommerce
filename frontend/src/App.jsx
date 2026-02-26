@@ -9,6 +9,7 @@ import CartPage from './pages/CartPage';
 import CheckoutPage from './pages/CheckoutPage';
 import { LoginPage, RegisterPage } from './pages/AuthPages';
 import { OrdersPage, OrderDetailPage } from './pages/OrderPages';
+import CategoryPage from './pages/CategoryPage';
 import './index.css';
 
 function ProtectedRoute({ children }) {
@@ -28,6 +29,7 @@ function App() {
               <Route path="/" element={<HomePage />} />
               <Route path="/products" element={<ProductsPage />} />
               <Route path="/product/:slug" element={<ProductDetailPage />} />
+              <Route path="/categories/:slug" element={<CategoryPage />} />
               <Route path="/cart" element={<CartPage />} />
               <Route path="/checkout" element={<CheckoutPage />} />
               <Route path="/login" element={<LoginPage />} />

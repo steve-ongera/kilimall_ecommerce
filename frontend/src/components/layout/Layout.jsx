@@ -1,34 +1,56 @@
 // Navbar.jsx
+import { useState, useEffect } from 'react';
 import { Link, useLocation } from 'react-router-dom';
-
-const NAV_ITEMS = [
-  { label: 'Home',            path: '/',                                icon: 'bi-house'           },
-  { label: 'All Products',    path: '/products',                        icon: 'bi-grid-3x3-gap'    }, // ← ADD THIS
-  { label: 'Electronics',     path: '/products?category=electronics',   icon: 'bi-laptop'          },
-  { label: 'Fashion',         path: '/products?category=fashion',       icon: 'bi-bag-heart'       },
-  { label: 'Home & Garden',   path: '/products?category=home-garden',   icon: 'bi-house-heart'     },
-  { label: 'Health & Beauty', path: '/products?category=health-beauty', icon: 'bi-heart-pulse'     },
-  { label: 'Phones & Tablets',path: '/products?category=phones-tablets',icon: 'bi-phone'           },
-  { label: 'Sports',          path: '/products?category=sports',        icon: 'bi-bicycle'         },
-  { label: 'Flash Deals',     path: '/products?flash_deals=true',       icon: 'bi-lightning-charge'},
-];
+import { categoryAPI } from '../../api';
 
 export function Navbar() {
   const location = useLocation();
+  const [categories, setCategories] = useState([]);
+
+  useEffect(() => {
+    categoryAPI.list().then(({ data }) => {
+      setCategories(data?.results || data || []);
+    });
+  }, []);
+
+  const staticItems = [
+    { label: 'Home',         path: '/',         icon: 'bi-house'           },
+    { label: 'All Products', path: '/products', icon: 'bi-grid-3x3-gap'    },
+    { label: 'Flash Deals',  path: '/products?is_flash_deal=true', icon: 'bi-lightning-charge' },
+  ];
+
   return (
     <nav className="navbar">
       <div className="container">
         <div className="nav-inner">
-          {NAV_ITEMS.map(item => (
+
+          {/* Static items */}
+          {staticItems.map(item => (
             <Link
               key={item.path}
               to={item.path}
-              className={`nav-item ${location.pathname === item.path ? 'active' : ''}`}
+              className={`nav-item ${location.pathname + location.search === item.path ? 'active' : ''}`}
             >
               <i className={`bi ${item.icon}`}></i>
               {item.label}
             </Link>
           ))}
+
+          {/* Divider */}
+          <div style={{ width: 1, height: 20, background: 'rgba(255,255,255,0.2)', margin: '0 4px', alignSelf: 'center' }} />
+
+          {/* Dynamic categories */}
+          {categories.map(cat => (
+            <Link
+              key={cat.slug}
+              to={`/categories/${cat.slug}`}
+              className={`nav-item ${location.pathname === `/categories/${cat.slug}` ? 'active' : ''}`}
+            >
+              {cat.icon && <i className={`bi ${cat.icon}`}></i>}
+              {cat.name}
+            </Link>
+          ))}
+
         </div>
       </div>
     </nav>
