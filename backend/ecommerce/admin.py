@@ -323,7 +323,12 @@ class CartAdmin(admin.ModelAdmin):
     item_count.short_description = "Items"
 
     def cart_total(self, obj):
-        return format_html('<b style="color:#f85606">KES {:,}</b>', int(obj.get_total()))
+        total = f"{int(obj.get_total()):,}"
+        return format_html(
+            '<b style="color:#f85606">KES {}</b>',
+            total
+        )
+
     cart_total.short_description = "Total"
 
 
