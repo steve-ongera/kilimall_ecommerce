@@ -46,6 +46,7 @@ export const authAPI = {
   login: (data) => api.post('/auth/login/', data),
   profile: () => api.get('/auth/profile/'),
   updateProfile: (data) => api.patch('/auth/profile/', data),
+  changePassword:(data) => api.post('/auth/change-password/', data),
 };
 
 export const categoryAPI = {

@@ -10,6 +10,8 @@ import CheckoutPage from './pages/CheckoutPage';
 import { LoginPage, RegisterPage } from './pages/AuthPages';
 import { OrdersPage, OrderDetailPage } from './pages/OrderPages';
 import CategoryPage from './pages/CategoryPage';
+import AccountPage from './pages/AccountPage';
+import WishlistPage from './pages/WishlistPage';
 import './index.css';
 
 function ProtectedRoute({ children }) {
@@ -36,8 +38,8 @@ function App() {
               <Route path="/register" element={<RegisterPage />} />
               <Route path="/orders" element={<ProtectedRoute><OrdersPage /></ProtectedRoute>} />
               <Route path="/orders/:id" element={<ProtectedRoute><OrderDetailPage /></ProtectedRoute>} />
-              <Route path="/wishlist" element={<ProtectedRoute><div className="container" style={{paddingTop:40}}>Wishlist page</div></ProtectedRoute>} />
-              <Route path="/account" element={<ProtectedRoute><div className="container" style={{paddingTop:40}}>Account page</div></ProtectedRoute>} />
+              <Route path="/wishlist"        element={<ProtectedRoute><WishlistPage /></ProtectedRoute>} />
+              <Route path="/account"         element={<ProtectedRoute><AccountPage /></ProtectedRoute>} />
               <Route path="*" element={
                 <div className="container" style={{ textAlign: 'center', paddingTop: 80 }}>
                   <i className="bi bi-exclamation-triangle" style={{ fontSize: 52, color: '#f85606', display: 'block', marginBottom: 12 }}></i>

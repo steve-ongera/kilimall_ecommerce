@@ -562,3 +562,17 @@ class MpesaSTKQueryView(APIView):
             # Don't fail — just return current DB status
 
         return Response(MpesaTransactionSerializer(txn).data)
+    
+    
+class ChangePasswordView(APIView):
+    permission_classes = [IsAuthenticated]
+
+    def post(self, request):
+        user = request.user
+        old  = request.data.get('old_password')
+        new  = request.data.get('new_password')
+        if not user.check_password(old):
+            return Response({'old_password': ['Wrong password.']}, status=400)
+        user.set_password(new)
+        user.save()
+        return Response({'detail': 'Password updated.'})

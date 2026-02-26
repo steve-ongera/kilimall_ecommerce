@@ -17,6 +17,7 @@ urlpatterns = [
     path('auth/register/', views.RegisterView.as_view(), name='register'),
     path('auth/login/', views.LoginView.as_view(), name='login'),
     path('auth/profile/', views.ProfileView.as_view(), name='profile'),
+    path('auth/change-password/', views.ChangePasswordView.as_view(), name='change-password'),
 
     # Cart
     path('cart/', views.CartView.as_view(), name='cart'),
