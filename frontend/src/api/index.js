@@ -54,11 +54,11 @@ export const categoryAPI = {
 };
 
 export const productAPI = {
-  list: (params) => api.get('/products/', { params }),
-  detail: (slug) => api.get(`/products/${slug}/`),
-  featured: () => api.get('/products/featured/'),
-  flashDeals: () => api.get('/products/flash_deals/'),
-  newArrivals: () => api.get('/products/new_arrivals/'),
+  list:       (params) => api.get('/products/', { params }),
+  detail:     (slug)   => api.get(`/products/${slug}/`),
+  featured:   ()       => api.get('/products/featured/'),
+  flashDeals: ()       => api.get('/products/flash_deals/'),
+  newArrivals:()       => api.get('/products/new_arrivals/'),
   reviews: (slug) => api.get(`/products/${slug}/reviews/`),
   addReview: (slug, data) => api.post(`/products/${slug}/reviews/`, data),
 };

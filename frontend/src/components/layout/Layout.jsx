@@ -2,14 +2,15 @@
 import { Link, useLocation } from 'react-router-dom';
 
 const NAV_ITEMS = [
-  { label: 'Home', path: '/', icon: 'bi-house' },
-  { label: 'Electronics', path: '/products?category=electronics', icon: 'bi-laptop' },
-  { label: 'Fashion', path: '/products?category=fashion', icon: 'bi-bag-heart' },
-  { label: 'Home & Garden', path: '/products?category=home-garden', icon: 'bi-house-heart' },
-  { label: 'Health & Beauty', path: '/products?category=health-beauty', icon: 'bi-heart-pulse' },
-  { label: 'Phones & Tablets', path: '/products?category=phones-tablets', icon: 'bi-phone' },
-  { label: 'Sports', path: '/products?category=sports', icon: 'bi-bicycle' },
-  { label: 'Flash Deals', path: '/products?flash_deals=true', icon: 'bi-lightning-charge' },
+  { label: 'Home',            path: '/',                                icon: 'bi-house'           },
+  { label: 'All Products',    path: '/products',                        icon: 'bi-grid-3x3-gap'    }, // ← ADD THIS
+  { label: 'Electronics',     path: '/products?category=electronics',   icon: 'bi-laptop'          },
+  { label: 'Fashion',         path: '/products?category=fashion',       icon: 'bi-bag-heart'       },
+  { label: 'Home & Garden',   path: '/products?category=home-garden',   icon: 'bi-house-heart'     },
+  { label: 'Health & Beauty', path: '/products?category=health-beauty', icon: 'bi-heart-pulse'     },
+  { label: 'Phones & Tablets',path: '/products?category=phones-tablets',icon: 'bi-phone'           },
+  { label: 'Sports',          path: '/products?category=sports',        icon: 'bi-bicycle'         },
+  { label: 'Flash Deals',     path: '/products?flash_deals=true',       icon: 'bi-lightning-charge'},
 ];
 
 export function Navbar() {

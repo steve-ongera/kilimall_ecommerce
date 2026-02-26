@@ -4,7 +4,7 @@ import hmac
 import json
 import requests
 from datetime import datetime
-
+from django_filters import rest_framework as df_filters
 from django.conf import settings
 from django.utils import timezone
 from rest_framework import viewsets, status, filters
@@ -107,13 +107,22 @@ class BrandViewSet(viewsets.ReadOnlyModelViewSet):
 
 
 # ─── Product ──────────────────────────────────────────────────────────────────
+class ProductFilter(df_filters.FilterSet):
+    min_price = df_filters.NumberFilter(field_name='price', lookup_expr='gte')
+    max_price = df_filters.NumberFilter(field_name='price', lookup_expr='lte')
+    category  = df_filters.CharFilter(field_name='category__slug')
+    brand     = df_filters.CharFilter(field_name='brand__slug')
+
+    class Meta:
+        model = Product
+        fields = ['category', 'brand', 'is_featured', 'is_flash_deal', 'min_price', 'max_price']
 
 class ProductViewSet(viewsets.ReadOnlyModelViewSet):
     queryset = Product.objects.filter(is_active=True).select_related('category', 'brand').prefetch_related('images')
     permission_classes = [AllowAny]
     lookup_field = 'slug'
     filter_backends = [DjangoFilterBackend, filters.SearchFilter, filters.OrderingFilter]
-    filterset_fields = ['category__slug', 'brand__slug', 'is_featured', 'is_flash_deal']
+    filterset_class = ProductFilter                    # ← swap this in (replaces filterset_fields)
     search_fields = ['name', 'description', 'sku', 'brand__name', 'category__name']
     ordering_fields = ['price', 'rating', 'created_at', 'views']
     ordering = ['-created_at']
