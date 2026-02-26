@@ -425,7 +425,12 @@ class OrderAdmin(admin.ModelAdmin):
     payment_badge.admin_order_field = "payment_status"
 
     def total_display(self, obj):
-        return format_html('<b style="color:#f85606;font-size:14px">KES {:,}</b>', int(obj.total))
+        total = f"{int(obj.total):,}"
+        return format_html(
+            '<b style="color:#f85606;font-size:14px">KES {}</b>',
+            total
+        )
+
     total_display.short_description = "Total"
     total_display.admin_order_field = "total"
 
@@ -483,8 +488,14 @@ class MpesaTransactionAdmin(admin.ModelAdmin):
     checkout_request_id_short.short_description = "Checkout Request ID"
 
     def amount_display(self, obj):
-        return format_html('<b style="color:#00a651">KES {:,}</b>', int(obj.amount))
+        amount = f"{int(obj.amount):,}"
+        return format_html(
+            '<b style="color:#00a651">KES {}</b>',
+            amount
+        )
+
     amount_display.short_description = "Amount"
+    amount_display.admin_order_field = "amount"
 
     STATUS_COLORS = {
         "pending":   "#faad14",
