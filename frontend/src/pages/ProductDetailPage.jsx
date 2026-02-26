@@ -17,6 +17,8 @@ export default function ProductDetailPage() {
   const [reviewText, setReviewText] = useState('');
   const [reviewRating, setReviewRating] = useState(5);
   const [submittingReview, setSubmittingReview] = useState(false);
+  const [related, setRelated] = useState([]);          // ← NEW
+  const [relatedLoading, setRelatedLoading] = useState(false); // ← NEW
   const { addToCart } = useCart();
   const { user } = useAuth();
   const navigate = useNavigate();
@@ -25,7 +27,20 @@ export default function ProductDetailPage() {
   useEffect(() => {
     setLoading(true);
     productAPI.detail(slug)
-      .then(({ data }) => setProduct(data))
+      .then(({ data }) => {
+        setProduct(data);
+        // Fetch related products from same category
+        if (data.category?.slug) {
+          setRelatedLoading(true);
+          productAPI.list({ category: data.category.slug, page_size: 6 })
+            .then(({ data: rel }) => {
+              const items = rel?.results || rel || [];
+              // Exclude current product
+              setRelated(items.filter(p => p.slug !== slug));
+            })
+            .finally(() => setRelatedLoading(false));
+        }
+      })
       .catch(() => navigate('/404'))
       .finally(() => setLoading(false));
   }, [slug]);
@@ -69,7 +84,6 @@ export default function ProductDetailPage() {
     }
   };
 
-  // Group variants by name
   const variantGroups = product.variants?.reduce((acc, v) => {
     if (!acc[v.name]) acc[v.name] = [];
     acc[v.name].push(v);
@@ -114,7 +128,6 @@ export default function ProductDetailPage() {
             )}
             <h1 className="product-detail-name">{product.name}</h1>
 
-            {/* Rating */}
             {product.review_count > 0 && (
               <div style={{ display: 'flex', alignItems: 'center', gap: 8, marginBottom: 16 }}>
                 <Stars rating={product.rating} />
@@ -124,7 +137,6 @@ export default function ProductDetailPage() {
               </div>
             )}
 
-            {/* Price */}
             <div style={{ marginBottom: 16 }}>
               <div className="product-detail-price">KES {finalPrice.toLocaleString()}</div>
               {product.original_price && (
@@ -137,7 +149,6 @@ export default function ProductDetailPage() {
               )}
             </div>
 
-            {/* Stock */}
             <div style={{ marginBottom: 16 }}>
               {product.stock > 0 ? (
                 <span style={{ color: 'var(--kl-green)', fontSize: 14, fontWeight: 600 }}>
@@ -150,7 +161,6 @@ export default function ProductDetailPage() {
               )}
             </div>
 
-            {/* Variants */}
             {variantGroups && Object.entries(variantGroups).map(([name, variants]) => (
               <div key={name} style={{ marginBottom: 16 }}>
                 <div style={{ fontSize: 13, fontWeight: 600, marginBottom: 8 }}>{name}:</div>
@@ -177,7 +187,6 @@ export default function ProductDetailPage() {
               </div>
             ))}
 
-            {/* Quantity */}
             <div style={{ marginBottom: 20 }}>
               <div style={{ fontSize: 13, fontWeight: 600, marginBottom: 8 }}>Quantity:</div>
               <div className="qty-control">
@@ -187,7 +196,6 @@ export default function ProductDetailPage() {
               </div>
             </div>
 
-            {/* CTA Buttons */}
             <div style={{ display: 'flex', gap: 12, flexWrap: 'wrap', marginBottom: 24 }}>
               <button className="btn-add-to-cart" onClick={handleAddToCart} disabled={product.stock === 0}>
                 <i className="bi bi-cart-plus"></i> Add to Cart
@@ -197,7 +205,6 @@ export default function ProductDetailPage() {
               </button>
             </div>
 
-            {/* Delivery info */}
             <div style={{ background: 'var(--kl-light-gray)', borderRadius: 4, padding: '14px 16px' }}>
               <div style={{ display: 'flex', alignItems: 'center', gap: 10, marginBottom: 8 }}>
                 <i className="bi bi-truck" style={{ color: 'var(--kl-orange)', fontSize: 18 }}></i>
@@ -211,7 +218,6 @@ export default function ProductDetailPage() {
               </Link>
             </div>
 
-            {/* Short details */}
             <div style={{ marginTop: 16, padding: '12px 0', borderTop: '1px solid var(--kl-border)' }}>
               {product.sku && (
                 <div style={{ fontSize: 12, color: '#888', marginBottom: 4 }}>SKU: {product.sku}</div>
@@ -268,7 +274,6 @@ export default function ProductDetailPage() {
                   ))}
                 </div>
               )}
-              {/* Review form */}
               {user && (
                 <form onSubmit={handleReviewSubmit} style={{ background: 'var(--kl-light-gray)', padding: 20, borderRadius: 4 }}>
                   <div style={{ fontWeight: 700, marginBottom: 12 }}>Write a Review</div>
@@ -312,6 +317,46 @@ export default function ProductDetailPage() {
           )}
         </div>
       </div>
+
+      {/* ── Related Products ───────────────────────────────────────────── */}
+      {(relatedLoading || related.length > 0) && (
+        <div style={{ marginTop: 32 }}>
+          <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: 16 }}>
+            <h2 style={{ fontSize: 18, fontWeight: 800, margin: 0 }}>
+              <i className="bi bi-grid" style={{ color: 'var(--kl-orange)', marginRight: 8 }}></i>
+              Related Products
+            </h2>
+            <Link
+              to={`/products?category=${product.category?.slug}`}
+              style={{ fontSize: 13, color: 'var(--kl-orange)', fontWeight: 600, textDecoration: 'none' }}
+            >
+              View all in {product.category?.name} →
+            </Link>
+          </div>
+
+          {relatedLoading ? (
+            // Skeleton placeholders
+            <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(180px, 1fr))', gap: 16 }}>
+              {Array.from({ length: 5 }).map((_, i) => (
+                <div key={i} style={{ background: '#fff', border: '1px solid #f0f0f0', borderRadius: 8, overflow: 'hidden' }}>
+                  <div style={{ height: 180, background: '#f5f5f5' }} />
+                  <div style={{ padding: 12 }}>
+                    <div style={{ height: 12, background: '#f5f5f5', borderRadius: 4, marginBottom: 8 }} />
+                    <div style={{ height: 12, background: '#f5f5f5', borderRadius: 4, width: '60%' }} />
+                  </div>
+                </div>
+              ))}
+            </div>
+          ) : (
+            <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(180px, 1fr))', gap: 16 }}>
+              {related.map(p => (
+                <ProductCard key={p.id} product={p} />
+              ))}
+            </div>
+          )}
+        </div>
+      )}
+
     </div>
   );
 }
